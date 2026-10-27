@@ -1,0 +1,49 @@
+# Compilación y paquetes Backend (Java / Maven)
+backend/target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Base de datos local embebida y datos temporales
+backend/data/
+**/data/*.mv.db
+**/data/*.trace.db
+*.db
+
+# Frontend (Node / React / Vite)
+frontend/node_modules/
+**/node_modules/
+frontend/dist/
+**/dist/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Entorno y Secretos
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDEs y Editores
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+
+# Archivos del Sistema Operativo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+*.log
+logs/
