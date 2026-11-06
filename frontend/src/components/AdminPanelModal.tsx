@@ -78,7 +78,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   };
 
   // Approve user directly from notification card
-  const handleAprobarUsuarioDirecto = async (userId: number, notifId: number) => {
+  const handleAprobarUsuarioDirecto = async (userId: string | number, notifId: number) => {
     try {
       await usuarioService.cambiarEstado(userId, true);
       await notificacionService.marcarComoLeida(notifId);

@@ -10,7 +10,7 @@ export interface Zona {
 }
 
 export interface Usuario {
-  id: number;
+  id: string | number;
   nombres: string;
   apellidos: string;
   nombreCompleto: string;
@@ -48,7 +48,7 @@ export interface Notificacion {
   tipo: string;
   titulo: string;
   mensaje: string;
-  usuarioRegistradoId?: number;
+  usuarioRegistradoId?: string | number;
   leida: boolean;
   createdAt: string;
 }
@@ -87,7 +87,7 @@ export interface Medico {
   estado: EstadoMedico;
   observaciones?: string;
   centrosMedicos: CentroMedico[];
-  visitadorId?: number;
+  visitadorId?: string | number;
   visitadorNombre?: string;
   visitadorCorreo?: string;
   zonaNombre?: string;
@@ -133,7 +133,7 @@ export interface FilterParams {
   especialidad?: string;
   estado?: EstadoMedico | '';
   centroId?: number | '';
-  visitadorId?: number | '';
+  visitadorId?: string | number | '';
   page?: number;
   size?: number;
   sortBy?: string;
