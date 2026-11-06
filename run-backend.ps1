@@ -1,6 +1,6 @@
 # Script para compilar y ejecutar el backend Spring Boot
 param (
-    [string]$Profile = "dev",
+    [string]$Profile = "standalone",
     [int]$Port = 8080
 )
 
@@ -17,9 +17,9 @@ $env:PORT = $Port
 
 # Si Maven está instalado en el sistema
 if (Get-Command mvn -ErrorAction SilentlyContinue) {
-    mvn spring-boot:run
+    mvn spring-boot:run "-Dspring-boot.run.profiles=$Profile"
 } elseif (Test-Path ".\mvnw.cmd") {
-    .\mvnw.cmd spring-boot:run
+    .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=$Profile"
 } else {
     Write-Host "Asegúrese de tener Maven instalado o utilice mvnw para ejecutar el backend." -ForegroundColor Yellow
 }
