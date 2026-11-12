@@ -123,54 +123,88 @@ GRANT EXECUTE ON FUNCTION public.check_setup_status() TO anon, authenticated, se
 
 -- Trigger: Gestiona la creación de perfiles y notificaciones al registrar un usuario en auth.users
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
 DECLARE
     v_total_usuarios INT;
     v_es_primer_usuario BOOLEAN;
     v_nombre VARCHAR(150);
     v_zona_id BIGINT := NULL;
-    v_rol rol_usuario;
+    v_rol public.rol_usuario;
     v_habilitado BOOLEAN;
 BEGIN
-    -- Comprobar si es el primer usuario de la empresa
+    -- Comprobar si ya existe algún perfil registrado en la empresa
     SELECT COUNT(*) INTO v_total_usuarios FROM public.perfiles;
     v_es_primer_usuario := (v_total_usuarios = 0);
 
     -- Extraer metadatos enviados desde el frontend (signup)
-    v_nombre := COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1));
+    v_nombre := COALESCE(
+        NEW.raw_user_meta_data->>'nombre',
+        split_part(COALESCE(NEW.email, 'usuario'), '@', 1)
+    );
     
-    IF NEW.raw_user_meta_data->>'zonaId' IS NOT NULL AND NEW.raw_user_meta_data->>'zonaId' != '' THEN
-        v_zona_id := (NEW.raw_user_meta_data->>'zonaId')::BIGINT;
+    -- Validar zona_id de forma segura evitando errores de casteo
+    IF NEW.raw_user_meta_data->>'zonaId' IS NOT NULL 
+       AND NEW.raw_user_meta_data->>'zonaId' != '' 
+       AND NEW.raw_user_meta_data->>'zonaId' != 'null' 
+       AND NEW.raw_user_meta_data->>'zonaId' != 'undefined' THEN
+        BEGIN
+            v_zona_id := (NEW.raw_user_meta_data->>'zonaId')::BIGINT;
+            -- Si la zona no existe en el catálogo, descartarla para no violar la FK
+            IF NOT EXISTS (SELECT 1 FROM public.zonas WHERE id = v_zona_id) THEN
+                v_zona_id := NULL;
+            END IF;
+        EXCEPTION WHEN OTHERS THEN
+            v_zona_id := NULL;
+        END;
     END IF;
 
     IF v_es_primer_usuario THEN
         -- El primer usuario es el Administrador de la empresa (aprobado automáticamente)
-        v_rol := 'ADMIN';
+        v_rol := 'ADMIN'::public.rol_usuario;
         v_habilitado := true;
     ELSE
         -- Los siguientes usuarios son VISITADORES que requieren aprobación del admin
-        v_rol := 'VISITADOR';
+        v_rol := 'VISITADOR'::public.rol_usuario;
         v_habilitado := false;
     END IF;
 
-    -- Insertar el perfil público
+    -- Insertar o actualizar el perfil público (idempotente)
     INSERT INTO public.perfiles (id, nombre, correo, rol, zona_id, habilitado)
-    VALUES (NEW.id, v_nombre, NEW.email, v_rol, v_zona_id, v_habilitado);
+    VALUES (NEW.id, v_nombre, COALESCE(NEW.email, ''), v_rol, v_zona_id, v_habilitado)
+    ON CONFLICT (id) DO UPDATE SET
+        nombre = EXCLUDED.nombre,
+        correo = EXCLUDED.correo,
+        rol = EXCLUDED.rol,
+        zona_id = EXCLUDED.zona_id,
+        habilitado = EXCLUDED.habilitado,
+        updated_at = NOW();
 
     -- Si no es el administrador inicial, generar notificación persistente para los administradores
     IF NOT v_es_primer_usuario THEN
-        INSERT INTO public.notificaciones (titulo, mensaje, tipo, usuario_relacionado_id)
-        VALUES (
-            'Nuevo usuario pendiente de aprobación',
-            'El usuario ' || v_nombre || ' (' || NEW.email || ') se ha registrado y requiere aprobación de cuenta.',
-            'NUEVO_USUARIO',
-            NEW.id
-        );
+        BEGIN
+            INSERT INTO public.notificaciones (titulo, mensaje, tipo, usuario_relacionado_id)
+            VALUES (
+                'Nuevo usuario pendiente de aprobación',
+                'El usuario ' || v_nombre || ' (' || COALESCE(NEW.email, '') || ') se ha registrado y requiere aprobación de cuenta.',
+                'NUEVO_USUARIO',
+                NEW.id
+            );
+        EXCEPTION WHEN OTHERS THEN
+            -- No abortar el registro si falla la inserción de notificación
+            NULL;
+        END;
     END IF;
 
     RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Error controlado en handle_new_user: %', SQLERRM;
+    RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Asignar el trigger al evento posterior a la creación en auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -226,6 +260,11 @@ CREATE POLICY "Admin puede actualizar cualquier perfil; usuario su propio nombre
     ON public.perfiles FOR UPDATE TO authenticated
     USING (id = auth.uid() OR public.es_admin())
     WITH CHECK (id = auth.uid() OR public.es_admin());
+
+DROP POLICY IF EXISTS "Permitir insercion de perfiles" ON public.perfiles;
+CREATE POLICY "Permitir insercion de perfiles"
+    ON public.perfiles FOR INSERT TO authenticated, service_role, anon
+    WITH CHECK (true);
 
 -- POLÍTICAS: CENTROS MÉDICOS (Catálogo compartido entre visitadores)
 DROP POLICY IF EXISTS "Centros médicos visibles para todos" ON public.centros_medicos;
