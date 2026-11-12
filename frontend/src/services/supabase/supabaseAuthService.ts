@@ -4,13 +4,24 @@ import { AuthResponse, SetupStatus, Usuario } from '../../types';
 export const supabaseAuthService = {
   checkSetupStatus: async (): Promise<SetupStatus> => {
     try {
+      // Intentar primero a través de la función RPC segura (habilitada para rol anon)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('check_setup_status');
+      if (!rpcError && rpcData) {
+        const payload = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+        return {
+          adminExists: Boolean(payload.adminExists),
+          totalUsuarios: Number(payload.totalUsuarios ?? 0),
+        };
+      }
+
+      // Respaldo secundario mediante consulta directa a perfiles
       const { count, error } = await supabase
         .from('perfiles')
         .select('*', { count: 'exact', head: true });
 
       if (error) {
         console.warn('Error al verificar setup de perfiles en Supabase:', error.message);
-        return { adminExists: true, totalUsuarios: 1 };
+        return { adminExists: false, totalUsuarios: 0 };
       }
 
       const total = count ?? 0;
@@ -18,8 +29,9 @@ export const supabaseAuthService = {
         adminExists: total > 0,
         totalUsuarios: total,
       };
-    } catch {
-      return { adminExists: true, totalUsuarios: 1 };
+    } catch (err: any) {
+      console.warn('Fallo al consultar setup status en Supabase:', err?.message);
+      return { adminExists: false, totalUsuarios: 0 };
     }
   },
 
@@ -204,5 +216,13 @@ export const supabaseAuthService = {
       authProvider: userData.user.app_metadata.provider === 'google' ? 'GOOGLE' : 'LOCAL',
       createdAt: perfil.created_at,
     };
+  },
+
+  logout: async (): Promise<void> => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err: any) {
+      console.warn('Error al cerrar sesión en Supabase:', err?.message);
+    }
   },
 };

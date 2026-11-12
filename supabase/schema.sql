@@ -105,6 +105,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Función RPC para verificar estado inicial de la empresa (accesible para visitantes anónimos y autenticados)
+CREATE OR REPLACE FUNCTION public.check_setup_status()
+RETURNS JSONB AS $$
+DECLARE
+    v_total INT;
+BEGIN
+    SELECT COUNT(*) INTO v_total FROM public.perfiles;
+    RETURN jsonb_build_object(
+        'adminExists', (v_total > 0),
+        'totalUsuarios', v_total
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.check_setup_status() TO anon, authenticated, service_role;
+
 -- Trigger: Gestiona la creación de perfiles y notificaciones al registrar un usuario en auth.users
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$

@@ -42,6 +42,31 @@ export const supabaseMedicoService = {
       query = query.eq('usuario_id', params.visitadorId);
     }
 
+    // Filtro por centro médico asignado
+    if (params.centroId) {
+      const { data: rels, error: relsError } = await supabase
+        .from('medico_centro_medico')
+        .select('medico_id')
+        .eq('centro_medico_id', params.centroId);
+
+      if (relsError) throw new Error(relsError.message);
+
+      const ids = (rels || []).map((r: any) => r.medico_id);
+      if (ids.length === 0) {
+        return {
+          content: [],
+          pageNumber: page,
+          pageSize: size,
+          totalElements: 0,
+          totalPages: 0,
+          first: true,
+          last: true,
+          empty: true,
+        };
+      }
+      query = query.in('id', ids);
+    }
+
     // Ordenamiento
     const sortBy = params.sortBy === 'nombreCompleto' ? 'nombres' : params.sortBy || 'created_at';
     const ascending = params.sortDir === 'asc';

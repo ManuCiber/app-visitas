@@ -34,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [checkingSetup, setCheckingSetup] = useState<boolean>(true);
 
   const logout = useCallback(() => {
+    authService.logout().catch(() => {});
     localStorage.removeItem('medicare_token');
     localStorage.removeItem('medicare_user');
     setToken(null);

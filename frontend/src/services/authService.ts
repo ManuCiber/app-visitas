@@ -35,4 +35,10 @@ export const authService = {
     if (useSupabase) return supabaseAuthService.getMe();
     return api.get<Usuario>('/auth/me');
   },
+
+  logout: async (): Promise<void> => {
+    if (useSupabase) {
+      await supabaseAuthService.logout();
+    }
+  },
 };
