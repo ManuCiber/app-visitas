@@ -4,7 +4,9 @@ import { Usuario, Zona, Notificacion } from '../types';
 import { usuarioService } from '../services/usuarioService';
 import { zonaService } from '../services/zonaService';
 import { notificacionService } from '../services/notificacionService';
+import { emailService } from '../services/emailService';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -18,6 +20,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   onDataChanged,
 }) => {
   const { success, error } = useToast();
+  const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<'usuarios' | 'zonas' | 'notificaciones'>('usuarios');
 
   // Data states
@@ -54,18 +57,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && isAdmin) {
       loadData();
     }
-  }, [isOpen]);
+  }, [isOpen, isAdmin]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !isAdmin) return null;
 
   // Toggle user active status / approve
   const handleToggleUserStatus = async (user: Usuario) => {
     const nuevoEstado = !user.activo;
     try {
       await usuarioService.cambiarEstado(user.id, nuevoEstado);
+      if (nuevoEstado) {
+        emailService.enviarAprobacionCuenta({
+          nombre: user.nombreCompleto,
+          correo: user.correo,
+        }).catch(() => {});
+      }
       success(
         nuevoEstado ? 'Cuenta Aprobada y Habilitada' : 'Cuenta Desactivada',
         `El usuario ${user.nombreCompleto} ha sido ${nuevoEstado ? 'aprobado exitosamente y ya puede iniciar sesión' : 'desactivado'}.`
@@ -82,6 +91,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     try {
       await usuarioService.cambiarEstado(userId, true);
       await notificacionService.marcarComoLeida(notifId);
+      const userAprobado = usuarios.find((u) => String(u.id) === String(userId));
+      if (userAprobado) {
+        emailService.enviarAprobacionCuenta({
+          nombre: userAprobado.nombreCompleto,
+          correo: userAprobado.correo,
+        }).catch(() => {});
+      }
       success('Usuario Aprobado', 'El visitador ha sido aprobado y habilitado en el sistema.');
       loadData();
       onDataChanged?.();

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stethoscope, Building2, UserPlus, Shield, Bell, LogOut, LogIn } from 'lucide-react';
+import { Stethoscope, Building2, UserPlus, Shield, Bell, LogOut, LogIn, Crown, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface NavbarProps {
@@ -35,20 +35,38 @@ export const Navbar: React.FC<NavbarProps> = ({
                   Directorio
                 </span>
                 {isAuthenticated && (
-                  <span
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
-                      isAdmin
-                        ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                        : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                    }`}
-                  >
-                    {usuario?.rol}
-                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase tracking-wider shadow-xs ${
+                        isAdmin
+                          ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      }`}
+                    >
+                      {isAdmin ? (
+                        <>
+                          <Crown className="w-3 h-3 mr-1 text-purple-700" />
+                          ADMIN GENERAL
+                        </>
+                      ) : (
+                        <>
+                          <Stethoscope className="w-3 h-3 mr-1 text-emerald-700" />
+                          VISITADOR MÉDICO
+                        </>
+                      )}
+                    </span>
+                    {!isAdmin && usuario?.zona && (
+                      <span className="hidden md:inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-700 rounded-full border border-slate-200">
+                        <MapPin className="w-2.5 h-2.5 mr-1 text-slate-500" />
+                        {usuario.zona.nombre}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
               <p className="text-xs text-slate-500 hidden sm:block">
                 {isAuthenticated
-                  ? `${usuario?.nombreCompleto} ${usuario?.zona ? `• ${usuario.zona.nombre}` : ''}`
+                  ? `${usuario?.nombreCompleto} (${usuario?.correo})`
                   : 'Gestión Integral de Médicos y Centros de Salud'}
               </p>
             </div>

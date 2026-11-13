@@ -225,4 +225,34 @@ export const supabaseAuthService = {
       console.warn('Error al cerrar sesión en Supabase:', err?.message);
     }
   },
+
+  solicitarRecuperacionPassword: async (correo: string): Promise<void> => {
+    const redirectTo = window.location.origin;
+    const { error } = await supabase.auth.resetPasswordForEmail(correo.trim(), {
+      redirectTo,
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  actualizarPassword: async (nuevaPassword: string): Promise<void> => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      throw new Error(
+        'No se encontró una sesión activa de recuperación. Para cambiar tu contraseña debes abrir el enlace enviado a tu correo.'
+      );
+    }
+    const { error } = await supabase.auth.updateUser({
+      password: nuevaPassword,
+    });
+    if (error) {
+      if (error.message.includes('Auth session missing')) {
+        throw new Error(
+          'El enlace de recuperación ha expirado o no es válido. Por favor solicita uno nuevo a tu correo.'
+        );
+      }
+      throw new Error(error.message);
+    }
+  },
 };

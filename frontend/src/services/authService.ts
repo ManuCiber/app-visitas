@@ -41,4 +41,14 @@ export const authService = {
       await supabaseAuthService.logout();
     }
   },
+
+  solicitarRecuperacionPassword: (correo: string): Promise<void> => {
+    if (useSupabase) return supabaseAuthService.solicitarRecuperacionPassword(correo);
+    return api.post<void>('/auth/forgot-password', { correo });
+  },
+
+  actualizarPassword: (nuevaPassword: string): Promise<void> => {
+    if (useSupabase) return supabaseAuthService.actualizarPassword(nuevaPassword);
+    return api.post<void>('/auth/reset-password', { password: nuevaPassword });
+  },
 };

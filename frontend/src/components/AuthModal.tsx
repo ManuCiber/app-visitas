@@ -20,7 +20,7 @@ import { Zona } from '../types';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultMode?: 'login' | 'register';
+  defaultMode?: 'login' | 'register' | 'forgot-password' | 'update-password';
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -28,12 +28,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   defaultMode = 'login',
 }) => {
-  const { login, register, loginWithGoogle, adminExists, refreshSetupStatus } = useAuth();
+  const {
+    login,
+    register,
+    loginWithGoogle,
+    adminExists,
+    refreshSetupStatus,
+    solicitarRecuperacionPassword,
+    actualizarPassword,
+  } = useAuth();
   const { success, error, info } = useToast();
 
-  const [mode, setMode] = useState<'login' | 'register'>(defaultMode);
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot-password' | 'update-password'>(defaultMode);
   const [correo, setCorreo] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [nombres, setNombres] = useState('');
   const [apellidos, setApellidos] = useState('');
   const [zonaId, setZonaId] = useState<number | ''>('');
@@ -41,6 +50,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [pendingApprovalSuccess, setPendingApprovalSuccess] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState(false);
 
   useEffect(() => {
     if (!adminExists) {
@@ -78,7 +88,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         await login(correo, password);
         success('Sesión iniciada', 'Bienvenido al sistema MediCare');
         onClose();
-      } else {
+      } else if (mode === 'register') {
         if (!nombres.trim() || !apellidos.trim() || !correo.trim() || !password.trim()) {
           setFormError('Todos los campos marcados son obligatorios');
           setLoading(false);
@@ -106,9 +116,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setPendingApprovalSuccess(true);
           await refreshSetupStatus();
         }
+      } else if (mode === 'forgot-password') {
+        if (!correo.trim()) {
+          setFormError('Por favor ingresa tu correo electrónico');
+          setLoading(false);
+          return;
+        }
+        await solicitarRecuperacionPassword(correo.trim());
+        setForgotSuccess(true);
+        success('Enlace Enviado', 'Revisa tu correo para restablecer tu contraseña');
+      } else if (mode === 'update-password') {
+        if (!password || password.length < 6) {
+          setFormError('La nueva contraseña debe tener al menos 6 caracteres');
+          setLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setFormError('Las contraseñas ingresadas no coinciden');
+          setLoading(false);
+          return;
+        }
+        await actualizarPassword(password);
+        success('Contraseña Actualizada', 'Tu contraseña ha sido actualizada con éxito');
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+        onClose();
       }
     } catch (err: any) {
-      setFormError(err.message || 'Error al procesar la solicitud');
+      const rawMsg = err?.message || err?.error_description || String(err) || '';
+      const msgLower = rawMsg.toLowerCase();
+      if (
+        msgLower.includes('auth session missing') ||
+        msgLower.includes('sesión activa') ||
+        msgLower.includes('session missing') ||
+        msgLower.includes('jwt')
+      ) {
+        setFormError(
+          'Para restablecer tu contraseña debes ingresar desde el enlace que enviamos a tu correo electrónico. No se encontró una sesión de recuperación activa.'
+        );
+      } else {
+        setFormError(rawMsg || 'Error al procesar la solicitud');
+      }
     } finally {
       setLoading(false);
     }
@@ -192,19 +241,59 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           ) : (
             <>
               <h2 className="text-xl font-bold">
-                {mode === 'login' ? 'Iniciar Sesión en MediCare' : 'Registro de Visitador Médico'}
+                {mode === 'login'
+                  ? 'Iniciar Sesión en MediCare'
+                  : mode === 'register'
+                  ? 'Registro de Visitador Médico'
+                  : mode === 'forgot-password'
+                  ? 'Recuperar Contraseña'
+                  : 'Crear Nueva Contraseña'}
               </h2>
               <p className="text-xs text-blue-100 mt-1">
                 {mode === 'login'
                   ? 'Acceda a su catálogo de médicos y centros de salud'
-                  : 'Cree su cuenta de visitador médico para su zona'}
+                  : mode === 'register'
+                  ? 'Cree su cuenta de visitador médico para su zona'
+                  : mode === 'forgot-password'
+                  ? 'Le enviaremos un enlace a su correo para restablecer su acceso'
+                  : 'Ingrese y confirme su nueva contraseña de acceso'}
               </p>
             </>
           )}
         </div>
 
-        {/* Pending Approval Confirmation View */}
-        {pendingApprovalSuccess ? (
+        {/* Forgot Password Success View */}
+        {forgotSuccess ? (
+          <div className="p-8 text-center space-y-4">
+            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+              <Mail className="w-9 h-9" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">¡Enlace Enviado con Éxito!</h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Hemos enviado las instrucciones de restablecimiento a <strong>{correo}</strong>.
+              </p>
+            </div>
+
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-left text-xs text-blue-900 space-y-2">
+              <p className="text-[12px] text-blue-800 leading-relaxed">
+                Por favor revisa tu bandeja de entrada o carpeta de spam y haz clic en el enlace para crear tu nueva contraseña.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setForgotSuccess(false);
+                setMode('login');
+              }}
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition"
+            >
+              Volver al Inicio de Sesión
+            </button>
+          </div>
+        ) : pendingApprovalSuccess ? (
           <div className="p-8 text-center space-y-4">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-9 h-9" />
@@ -242,8 +331,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         ) : (
           <>
-            {/* Quick Demo Credentials Banner (solo visible si existe admin) */}
-            {adminExists && (
+            {/* Quick Demo Credentials Banner (solo visible en modo login) */}
+            {adminExists && mode === 'login' && (
               <div className="px-6 pt-3 pb-2 bg-blue-50/50 border-b border-blue-100">
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-[10px] font-semibold text-blue-900 uppercase tracking-wider">
@@ -323,39 +412,94 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Correo Electrónico <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="email"
-                    required
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    placeholder="usuario@medicare.do"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  />
+              {mode !== 'update-password' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Correo Electrónico <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="email"
+                      required
+                      value={correo}
+                      onChange={(e) => setCorreo(e.target.value)}
+                      placeholder="usuario@medicare.do"
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Contraseña <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  />
+              {(mode === 'login' || mode === 'register') && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-medium text-slate-700">
+                      Contraseña <span className="text-red-500">*</span>
+                    </label>
+                    {mode === 'login' && adminExists && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormError('');
+                          setMode('forgot-password');
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium hover:underline transition"
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {mode === 'update-password' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Nueva Contraseña <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Mínimo 6 caracteres"
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Confirmar Nueva Contraseña <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="password"
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Repite la nueva contraseña"
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               {mode === 'register' && adminExists && (
                 <div>
@@ -396,13 +540,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     ? '👑 Registrar Empresa y Administrador'
                     : mode === 'login'
                     ? 'Iniciar Sesión'
-                    : 'Solicitar Registro de Visitador'}
+                    : mode === 'register'
+                    ? 'Solicitar Registro de Visitador'
+                    : mode === 'forgot-password'
+                    ? 'Enviar Enlace de Recuperación'
+                    : 'Guardar Nueva Contraseña'}
                 </span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
               {/* Google OAuth Alternative */}
-              {adminExists && (
+              {adminExists && (mode === 'login' || mode === 'register') && (
                 <>
                   <div className="relative my-4 text-center">
                     <div className="absolute inset-0 flex items-center">
@@ -441,7 +589,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </>
               )}
 
-              {/* Toggle Login / Register */}
+              {/* Toggle Modes */}
               {adminExists && (
                 <div className="pt-2 text-center text-xs text-slate-500">
                   {mode === 'login' ? (
@@ -458,7 +606,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         Registrarse como visitador
                       </button>
                     </span>
-                  ) : (
+                  ) : mode === 'register' ? (
                     <span>
                       ¿Ya tienes una cuenta?{' '}
                       <button
@@ -470,6 +618,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         className="text-blue-600 font-semibold hover:underline"
                       >
                         Iniciar sesión
+                      </button>
+                    </span>
+                  ) : (
+                    <span>
+                      ¿Recordaste tu contraseña?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormError('');
+                          setMode('login');
+                        }}
+                        className="text-blue-600 font-semibold hover:underline"
+                      >
+                        Volver a iniciar sesión
                       </button>
                     </span>
                   )}

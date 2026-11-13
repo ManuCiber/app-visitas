@@ -6,6 +6,7 @@ interface CentroMedicoModalProps {
   isOpen: boolean;
   onClose: () => void;
   centros: CentroMedico[];
+  isAdmin?: boolean;
   onSaveCentro: (data: CentroMedicoRequest, id?: number) => Promise<void>;
   onDeleteCentro: (id: number) => Promise<void>;
 }
@@ -14,6 +15,7 @@ export const CentroMedicoModal: React.FC<CentroMedicoModalProps> = ({
   isOpen,
   onClose,
   centros,
+  isAdmin = false,
   onSaveCentro,
   onDeleteCentro,
 }) => {
@@ -121,6 +123,12 @@ export const CentroMedicoModal: React.FC<CentroMedicoModalProps> = ({
                 </button>
               </div>
 
+              {!isAdmin && (
+                <div className="mb-4 p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 leading-relaxed">
+                  ℹ️ <strong>Vista de Visitador:</strong> Catálogo compartido de centros de salud. Para editar o eliminar registros de la red médica, consulte al <strong>Administrador General</strong>.
+                </div>
+              )}
+
               {centros.length === 0 ? (
                 <p className="text-center py-8 text-xs text-slate-500">
                   No hay centros médicos registrados aún.
@@ -159,22 +167,26 @@ export const CentroMedicoModal: React.FC<CentroMedicoModalProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-1 flex-shrink-0">
-                        <button
-                          onClick={() => handleStartEdit(c)}
-                          title="Editar centro"
-                          className="p-1.5 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onDeleteCentro(c.id)}
-                          title="Eliminar centro"
-                          className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {isAdmin ? (
+                        <div className="flex items-center space-x-1 flex-shrink-0">
+                          <button
+                            onClick={() => handleStartEdit(c)}
+                            title="Editar centro"
+                            className="p-1.5 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteCentro(c.id)}
+                            title="Eliminar centro"
+                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 font-medium">Red Médica</span>
+                      )}
                     </div>
                   ))}
                 </div>

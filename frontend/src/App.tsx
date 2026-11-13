@@ -26,11 +26,11 @@ import {
   PageResponse,
   Usuario,
 } from './types';
-import { Shield, UserCheck } from 'lucide-react';
+import { Shield, UserCheck, Crown, Stethoscope, MapPin, Lock, ArrowRight } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { success, error, info } = useToast();
-  const { usuario, isAuthenticated, isAdmin, adminExists } = useAuth();
+  const { usuario, isAuthenticated, isAdmin, adminExists, isRecoveryMode, setIsRecoveryMode } = useAuth();
 
   // Data states
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -69,7 +69,16 @@ export const App: React.FC = () => {
   const [isCentrosModalOpen, setIsCentrosModalOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authDefaultMode, setAuthDefaultMode] = useState<'login' | 'register'>('login');
+  const [authDefaultMode, setAuthDefaultMode] = useState<
+    'login' | 'register' | 'forgot-password' | 'update-password'
+  >('login');
+
+  useEffect(() => {
+    if (isRecoveryMode) {
+      setAuthDefaultMode('update-password');
+      setIsAuthModalOpen(true);
+    }
+  }, [isRecoveryMode]);
 
   // Fetch doctors
   const fetchMedicos = useCallback(async () => {
@@ -254,7 +263,9 @@ export const App: React.FC = () => {
       <Navbar
         onOpenNuevoMedico={handleOpenNuevoMedico}
         onOpenCentros={() => setIsCentrosModalOpen(true)}
-        onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+        onOpenAdminPanel={() => {
+          if (isAdmin) setIsAdminPanelOpen(true);
+        }}
         onOpenAuth={() => {
           setAuthDefaultMode('login');
           setIsAuthModalOpen(true);
@@ -267,38 +278,84 @@ export const App: React.FC = () => {
         {/* Role Banner */}
         {isAuthenticated && (
           <div
-            className={`mb-6 p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
+            className={`mb-6 p-5 rounded-2xl border shadow-xs transition-all ${
               isAdmin
-                ? 'bg-purple-50/70 border-purple-200 text-purple-950'
-                : 'bg-blue-50/70 border-blue-200 text-blue-950'
+                ? 'bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border-purple-200 text-purple-950'
+                : 'bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-emerald-50/90 border-emerald-200 text-emerald-950'
             }`}
           >
-            <div className="flex items-center space-x-3">
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center text-white flex-shrink-0 ${
-                  isAdmin ? 'bg-purple-600' : 'bg-blue-600'
-                }`}
-              >
-                {isAdmin ? <Shield className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider">
-                  {isAdmin ? 'Modo Administrador Global' : 'Modo Visitador Médico Asignado'}
-                </p>
-                <p className="text-xs opacity-85 mt-0.5">
-                  {isAdmin
-                    ? 'Visualización completa de médicos de todos los visitadores y control de usuarios/zonas.'
-                    : `Mostrando únicamente los médicos bajo tu gestión y responsabilidad directa (${
-                        usuario?.zona ? usuario.zona.nombre : 'Sin zona'
-                      }).`}
-                </p>
-              </div>
-            </div>
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+              <div className="flex items-start space-x-3.5">
+                <div
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center text-white flex-shrink-0 shadow-sm ${
+                    isAdmin ? 'bg-purple-600 shadow-purple-500/25' : 'bg-emerald-600 shadow-emerald-500/25'
+                  }`}
+                >
+                  {isAdmin ? <Crown className="w-6 h-6" /> : <Stethoscope className="w-6 h-6" />}
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-bold uppercase tracking-wider">
+                      {isAdmin ? '👑 Modo Administrador General' : '🩺 Modo Visitador Médico — Cartera Exclusiva'}
+                    </h3>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                        isAdmin
+                          ? 'bg-purple-200/80 text-purple-800'
+                          : 'bg-emerald-200/80 text-emerald-800'
+                      }`}
+                    >
+                      {isAdmin ? 'Control Total' : 'Vista Protegida'}
+                    </span>
+                  </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/80 border border-slate-200">
-                {usuario?.correo}
-              </span>
+                  {isAdmin ? (
+                    <p className="text-xs text-purple-900/80 mt-1 max-w-3xl leading-relaxed">
+                      Tienes control administrativo total: supervisión global de la red médica de todos los visitadores,
+                      aprobación de nuevas cuentas, gestión de zonas y administración de centros de salud.
+                    </p>
+                  ) : (
+                    <div className="mt-1 space-y-1 max-w-3xl">
+                      <p className="text-xs text-emerald-900/90 leading-relaxed">
+                        Bienvenido, <strong>{usuario?.nombreCompleto}</strong>. Estás viendo únicamente el total de tus médicos
+                        asignados, tus especialidades y los centros de salud disponibles para tu gestión directa.
+                      </p>
+                      <p className="text-[11px] text-emerald-800/80 flex items-center gap-1.5 font-medium">
+                        <Lock className="w-3.5 h-3.5 flex-shrink-0 text-emerald-700" />
+                        <span>
+                          Tu cuenta no posee permisos de administrador. Para cambios de zona, autorizaciones o edición de centros,
+                          <strong> consúltaselo al Administrador General</strong>.
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions / Info Badges */}
+              <div className="flex flex-wrap items-center gap-2 self-stretch lg:self-center justify-end">
+                {isAdmin ? (
+                  <button
+                    onClick={() => setIsAdminPanelOpen(true)}
+                    className="inline-flex items-center px-3.5 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs transition"
+                  >
+                    <Shield className="w-4 h-4 mr-1.5" />
+                    <span>Abrir Panel de Control</span>
+                    <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                  </button>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold bg-white/90 text-emerald-900 border border-emerald-200 shadow-2xs">
+                      <MapPin className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                      Zona: {usuario?.zona?.nombre || 'General'}
+                    </span>
+                    <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold bg-white/90 text-slate-700 border border-slate-200 shadow-2xs">
+                      <UserCheck className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                      {usuario?.correo}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -395,12 +452,15 @@ export const App: React.FC = () => {
       {/* Modals */}
       <AuthModal
         isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setIsRecoveryMode(false);
+        }}
         defaultMode={authDefaultMode}
       />
 
       <AdminPanelModal
-        isOpen={isAdminPanelOpen}
+        isOpen={isAdminPanelOpen && isAdmin}
         onClose={() => setIsAdminPanelOpen(false)}
         onDataChanged={() => {
           fetchMetadata();
@@ -436,6 +496,7 @@ export const App: React.FC = () => {
         isOpen={isCentrosModalOpen}
         onClose={() => setIsCentrosModalOpen(false)}
         centros={centros}
+        isAdmin={isAdmin}
         onSaveCentro={handleSaveCentro}
         onDeleteCentro={handleDeleteCentro}
       />

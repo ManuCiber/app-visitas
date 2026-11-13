@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AuthResponse, Usuario } from '../types';
 import { authService } from '../services/authService';
+import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
   usuario: Usuario | null;
@@ -10,12 +11,16 @@ interface AuthContextType {
   isVisitador: boolean;
   adminExists: boolean;
   checkingSetup: boolean;
+  isRecoveryMode: boolean;
+  setIsRecoveryMode: (val: boolean) => void;
   refreshSetupStatus: () => Promise<boolean>;
   login: (correo: string, password: string) => Promise<void>;
   register: (data: { nombres: string; apellidos: string; correo: string; password: string; zonaId?: number }) => Promise<AuthResponse>;
   loginWithGoogle: (idToken: string, zonaId?: number) => Promise<AuthResponse>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
+  solicitarRecuperacionPassword: (correo: string) => Promise<void>;
+  actualizarPassword: (nuevaPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +37,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [adminExists, setAdminExists] = useState<boolean>(true);
   const [checkingSetup, setCheckingSetup] = useState<boolean>(true);
+  const [isRecoveryMode, setIsRecoveryMode] = useState<boolean>(() => {
+    return window.location.hash.includes('type=recovery') && window.location.hash.includes('access_token');
+  });
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+      }
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, []);
 
   const logout = useCallback(() => {
     authService.logout().catch(() => {});
@@ -117,6 +137,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const solicitarRecuperacionPassword = async (correo: string) => {
+    await authService.solicitarRecuperacionPassword(correo);
+  };
+
+  const actualizarPassword = async (nuevaPassword: string) => {
+    await authService.actualizarPassword(nuevaPassword);
+    setIsRecoveryMode(false);
+  };
+
   const isAuthenticated = Boolean(token && usuario);
   const isAdmin = usuario?.rol === 'ADMIN';
   const isVisitador = usuario?.rol === 'VISITADOR';
@@ -131,12 +160,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isVisitador,
         adminExists,
         checkingSetup,
+        isRecoveryMode,
+        setIsRecoveryMode,
         refreshSetupStatus,
         login,
         register,
         loginWithGoogle,
         logout,
         refreshProfile,
+        solicitarRecuperacionPassword,
+        actualizarPassword,
       }}
     >
       {children}
