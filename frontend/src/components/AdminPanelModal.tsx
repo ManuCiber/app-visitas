@@ -12,16 +12,24 @@ interface AdminPanelModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDataChanged?: () => void;
+  initialTab?: 'usuarios' | 'zonas' | 'notificaciones';
 }
 
 export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   isOpen,
   onClose,
   onDataChanged,
+  initialTab = 'usuarios',
 }) => {
   const { success, error } = useToast();
   const { isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'zonas' | 'notificaciones'>('usuarios');
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'zonas' | 'notificaciones'>(initialTab);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Data states
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);

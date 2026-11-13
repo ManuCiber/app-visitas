@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
-import { StatsCards } from './components/StatsCards';
-import { FilterBar } from './components/FilterBar';
-import { MedicoTable } from './components/MedicoTable';
-import { Pagination } from './components/Pagination';
 import { MedicoModal } from './components/MedicoModal';
 import { MedicoDetailModal } from './components/MedicoDetailModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { CentroMedicoModal } from './components/CentroMedicoModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { AuthModal } from './components/AuthModal';
+import { AdminView } from './components/AdminView';
+import { VisitadorView } from './components/VisitadorView';
 import { useToast } from './context/ToastContext';
 import { useAuth } from './context/AuthContext';
 import { medicoService } from './services/medicoService';
@@ -26,7 +24,6 @@ import {
   PageResponse,
   Usuario,
 } from './types';
-import { Shield, UserCheck, Crown, Stethoscope, MapPin, Lock, ArrowRight } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { success, error, info } = useToast();
@@ -68,10 +65,20 @@ export const App: React.FC = () => {
 
   const [isCentrosModalOpen, setIsCentrosModalOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [adminPanelInitialTab, setAdminPanelInitialTab] = useState<'usuarios' | 'zonas' | 'notificaciones'>('usuarios');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authDefaultMode, setAuthDefaultMode] = useState<
     'login' | 'register' | 'forgot-password' | 'update-password'
   >('login');
+
+  const handleOpenAdminPanel = (tab: 'usuarios' | 'zonas' | 'notificaciones' = 'usuarios') => {
+    setAdminPanelInitialTab(tab);
+    setIsAdminPanelOpen(true);
+  };
+
+  const handleOpenCentros = () => {
+    setIsCentrosModalOpen(true);
+  };
 
   useEffect(() => {
     if (isRecoveryMode) {
@@ -263,9 +270,7 @@ export const App: React.FC = () => {
       <Navbar
         onOpenNuevoMedico={handleOpenNuevoMedico}
         onOpenCentros={() => setIsCentrosModalOpen(true)}
-        onOpenAdminPanel={() => {
-          if (isAdmin) setIsAdminPanelOpen(true);
-        }}
+        onOpenAdminPanel={handleOpenAdminPanel}
         onOpenAuth={() => {
           setAuthDefaultMode('login');
           setIsAuthModalOpen(true);
@@ -275,91 +280,6 @@ export const App: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Role Banner */}
-        {isAuthenticated && (
-          <div
-            className={`mb-6 p-5 rounded-2xl border shadow-xs transition-all ${
-              isAdmin
-                ? 'bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border-purple-200 text-purple-950'
-                : 'bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-emerald-50/90 border-emerald-200 text-emerald-950'
-            }`}
-          >
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-              <div className="flex items-start space-x-3.5">
-                <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center text-white flex-shrink-0 shadow-sm ${
-                    isAdmin ? 'bg-purple-600 shadow-purple-500/25' : 'bg-emerald-600 shadow-emerald-500/25'
-                  }`}
-                >
-                  {isAdmin ? <Crown className="w-6 h-6" /> : <Stethoscope className="w-6 h-6" />}
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-bold uppercase tracking-wider">
-                      {isAdmin ? '👑 Modo Administrador General' : '🩺 Modo Visitador Médico — Cartera Exclusiva'}
-                    </h3>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        isAdmin
-                          ? 'bg-purple-200/80 text-purple-800'
-                          : 'bg-emerald-200/80 text-emerald-800'
-                      }`}
-                    >
-                      {isAdmin ? 'Control Total' : 'Vista Protegida'}
-                    </span>
-                  </div>
-
-                  {isAdmin ? (
-                    <p className="text-xs text-purple-900/80 mt-1 max-w-3xl leading-relaxed">
-                      Tienes control administrativo total: supervisión global de la red médica de todos los visitadores,
-                      aprobación de nuevas cuentas, gestión de zonas y administración de centros de salud.
-                    </p>
-                  ) : (
-                    <div className="mt-1 space-y-1 max-w-3xl">
-                      <p className="text-xs text-emerald-900/90 leading-relaxed">
-                        Bienvenido, <strong>{usuario?.nombreCompleto}</strong>. Estás viendo únicamente el total de tus médicos
-                        asignados, tus especialidades y los centros de salud disponibles para tu gestión directa.
-                      </p>
-                      <p className="text-[11px] text-emerald-800/80 flex items-center gap-1.5 font-medium">
-                        <Lock className="w-3.5 h-3.5 flex-shrink-0 text-emerald-700" />
-                        <span>
-                          Tu cuenta no posee permisos de administrador. Para cambios de zona, autorizaciones o edición de centros,
-                          <strong> consúltaselo al Administrador General</strong>.
-                        </span>
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions / Info Badges */}
-              <div className="flex flex-wrap items-center gap-2 self-stretch lg:self-center justify-end">
-                {isAdmin ? (
-                  <button
-                    onClick={() => setIsAdminPanelOpen(true)}
-                    className="inline-flex items-center px-3.5 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs transition"
-                  >
-                    <Shield className="w-4 h-4 mr-1.5" />
-                    <span>Abrir Panel de Control</span>
-                    <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                  </button>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold bg-white/90 text-emerald-900 border border-emerald-200 shadow-2xs">
-                      <MapPin className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                      Zona: {usuario?.zona?.nombre || 'General'}
-                    </span>
-                    <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold bg-white/90 text-slate-700 border border-slate-200 shadow-2xs">
-                      <UserCheck className="w-3.5 h-3.5 mr-1 text-slate-500" />
-                      {usuario?.correo}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {!isAuthenticated && (
           <div className="p-8 mb-6 bg-white rounded-2xl border border-slate-200 text-center shadow-xs">
             {!adminExists ? (
@@ -402,43 +322,51 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {isAuthenticated && (
-          <>
-            {/* Dashboard Metric Cards */}
-            <StatsCards stats={stats} loading={statsLoading} />
+        {/* View for Admin */}
+        {isAuthenticated && isAdmin && (
+          <AdminView
+            usuario={usuario}
+            medicos={medicos}
+            stats={stats}
+            statsLoading={statsLoading}
+            centros={centros}
+            especialidades={especialidades}
+            visitadores={visitadores}
+            unreadNotifsCount={unreadNotifsCount}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onResetFilters={handleResetFilters}
+            pageData={pageData}
+            loading={loading}
+            onOpenNuevoMedico={handleOpenNuevoMedico}
+            onOpenCentros={handleOpenCentros}
+            onOpenAdminPanel={handleOpenAdminPanel}
+            onViewMedico={handleOpenViewMedico}
+            onEditMedico={handleOpenEditMedico}
+            onDeleteMedico={handleOpenDeleteMedico}
+          />
+        )}
 
-            {/* Filter Toolbar */}
-            <FilterBar
-              filters={filters}
-              onFilterChange={handleFilterChange}
-              onResetFilters={handleResetFilters}
-              especialidades={especialidades}
-              centros={centros}
-              visitadores={visitadores}
-              isAdmin={isAdmin}
-              totalResults={pageData?.totalElements || 0}
-            />
-
-            {/* Doctor List Table */}
-            <MedicoTable
-              medicos={medicos}
-              loading={loading}
-              isAdmin={isAdmin}
-              onView={handleOpenViewMedico}
-              onEdit={handleOpenEditMedico}
-              onDelete={handleOpenDeleteMedico}
-              onOpenNuevoMedico={handleOpenNuevoMedico}
-            />
-
-            {/* Interactive Pagination */}
-            <Pagination
-              pageData={pageData}
-              currentPage={filters.page || 0}
-              pageSize={filters.size || 10}
-              onPageChange={(page) => handleFilterChange({ page })}
-              onPageSizeChange={(size) => handleFilterChange({ size, page: 0 })}
-            />
-          </>
+        {/* Dedicated View for Visitador */}
+        {isAuthenticated && !isAdmin && (
+          <VisitadorView
+            usuario={usuario}
+            medicos={medicos}
+            stats={stats}
+            statsLoading={statsLoading}
+            centros={centros}
+            especialidades={especialidades}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onResetFilters={handleResetFilters}
+            pageData={pageData}
+            loading={loading}
+            onOpenNuevoMedico={handleOpenNuevoMedico}
+            onOpenCentros={handleOpenCentros}
+            onViewMedico={handleOpenViewMedico}
+            onEditMedico={handleOpenEditMedico}
+            onDeleteMedico={handleOpenDeleteMedico}
+          />
         )}
       </main>
 
@@ -462,6 +390,7 @@ export const App: React.FC = () => {
       <AdminPanelModal
         isOpen={isAdminPanelOpen && isAdmin}
         onClose={() => setIsAdminPanelOpen(false)}
+        initialTab={adminPanelInitialTab}
         onDataChanged={() => {
           fetchMetadata();
           fetchMedicos();
